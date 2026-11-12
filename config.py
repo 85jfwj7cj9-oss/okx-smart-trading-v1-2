@@ -1,0 +1,215 @@
+
+import os
+
+
+def get_bool(name, default=False):
+    value = os.getenv(name)
+
+    if value is None:
+        return default
+
+    return value.strip().lower() in {
+        "1", "true", "yes", "on"
+    }
+
+
+def get_int(name, default, minimum=None, maximum=None):
+    try:
+        value = int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        value = default
+
+    if minimum is not None:
+        value = max(minimum, value)
+
+    if maximum is not None:
+        value = min(maximum, value)
+
+    return value
+
+
+def get_float(name, default, minimum=None, maximum=None):
+    try:
+        value = float(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        value = default
+
+    if minimum is not None:
+        value = max(minimum, value)
+
+    if maximum is not None:
+        value = min(maximum, value)
+
+    return value
+
+
+def normalize_database_url(url):
+    """正規化 Render PostgreSQL 連線網址。"""
+
+    if not url:
+        return ""
+
+    url = url.strip()
+
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://"):]
+
+    return url
+
+
+class Config:
+
+    APP_NAME = "OKX SMART TRADING V1.2"
+    APP_ENV = os.getenv("APP_ENV", "development")
+    TIMEZONE = os.getenv("TIMEZONE", "Asia/Taipei")
+
+    SECRET_KEY = os.getenv(
+        "APP_SECRET_KEY",
+        "development-only-change-before-deployment"
+    )
+
+    ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "")
+
+    OKX_BASE_URL = os.getenv(
+        "OKX_BASE_URL",
+        "https://www.okx.com"
+    ).rstrip("/")
+
+    OKX_DEMO_MODE = True
+
+    SCAN_INTERVAL_SECONDS = get_int(
+        "SCAN_INTERVAL_SECONDS", 60, 15, 3600
+    )
+
+    TOP_N_SYMBOLS = get_int(
+        "TOP_N_SYMBOLS",
+        get_int("MAX_SCAN_SYMBOLS", 500, 1, 1000),
+        1,
+        1000
+    )
+
+    TIMEFRAMES = ("1H", "4H")
+    ALLOWED_TIMEFRAMES = ("15M", "1H", "4H", "1D", "1W")
+
+    BTC_BENCHMARK = os.getenv(
+        "BTC_BENCHMARK",
+        "BTC-USDT-SWAP"
+    )
+
+    MIN_SIGNAL_SCORE = get_int(
+        "MIN_SIGNAL_SCORE", 60, 0, 100
+    )
+
+    ENABLE_LONG = get_bool("ENABLE_LONG", True)
+    ENABLE_SHORT = get_bool("ENABLE_SHORT", True)
+
+    INITIAL_EQUITY_USDT = get_float(
+        "INITIAL_EQUITY_USDT", 1000, 0.01
+    )
+
+    RISK_PER_TRADE_PERCENT = get_float(
+        "RISK_PER_TRADE_PERCENT", 1, 0.01, 5
+    )
+
+    SIMULATED_LEVERAGE = get_float(
+        "SIMULATED_LEVERAGE", 5, 1, 20
+    )
+
+    TAKER_FEE_RATE = get_float(
+        "TAKER_FEE_RATE", 0.0005, 0, 0.1
+    )
+
+    SLIPPAGE_RATE = get_float(
+        "SLIPPAGE_RATE", 0.0005, 0, 0.1
+    )
+
+    LINE_CHANNEL_ACCESS_TOKEN = os.getenv(
+        "LINE_CHANNEL_ACCESS_TOKEN", ""
+    )
+
+    LINE_CHANNEL_SECRET = os.getenv(
+        "LINE_CHANNEL_SECRET", ""
+    )
+
+    LINE_TO_USER_ID = os.getenv(
+        "LINE_TO_USER_ID", ""
+    )
+
+    LINE_ENABLED = get_bool(
+        "LINE_ENABLED", False
+    )
+
+    # V1.1 / Stage 3 radar and pattern engine thresholds.
+    MIN_TURNOVER_USDT = get_float("MIN_TURNOVER_USDT", 5_000_000, 0)
+    MAX_SPREAD_PCT = get_float("MAX_SPREAD_PCT", 0.20, 0.001, 5)
+    MAX_TICKER_AGE_SECONDS = get_float("MAX_TICKER_AGE_SECONDS", 30, 1, 600)
+    PATTERN_PIVOT_LEFT = get_int("PATTERN_PIVOT_LEFT", 3, 1, 20)
+    PATTERN_PIVOT_RIGHT = get_int("PATTERN_PIVOT_RIGHT", 3, 1, 20)
+    PATTERN_PRZ_ATR_DISTANCE = get_float("PATTERN_PRZ_ATR_DISTANCE", 0.5, 0.05, 5)
+
+    # Database
+    DATABASE_URL = normalize_database_url(
+        os.getenv("DATABASE_URL", "")
+    )
+
+    DATABASE_PATH = os.getenv(
+        "DATABASE_PATH",
+        "data/okx_trading.db"
+    )
+
+    DATABASE_CONNECT_TIMEOUT = get_int(
+        "DATABASE_CONNECT_TIMEOUT", 15, 1, 120
+    )
+
+    DATABASE_BACKEND = (
+        "postgresql" if DATABASE_URL else "sqlite"
+    )
+
+    AUTO_TRADING_ENABLED = False
+    LIVE_ORDER_ENABLED = False
+
+    @classmethod
+    def validate(cls):
+        errors = []
+
+        if not cls.TIMEFRAMES:
+            errors.append("TIMEFRAMES cannot be empty")
+
+        invalid = [
+            item for item in cls.TIMEFRAMES
+            if item not in cls.ALLOWED_TIMEFRAMES
+        ]
+
+        if invalid:
+            errors.append(
+                f"Invalid timeframes: {invalid}"
+            )
+
+        if not 0 < cls.RISK_PER_TRADE_PERCENT <= 5:
+            errors.append("Invalid risk percentage")
+
+        if cls.INITIAL_EQUITY_USDT <= 0:
+            errors.append("Initial equity must be positive")
+
+        if not 1 <= cls.SIMULATED_LEVERAGE <= 20:
+            errors.append("Invalid simulated leverage")
+
+        if not 0 <= cls.MIN_SIGNAL_SCORE <= 100:
+            errors.append("Invalid minimum signal score")
+
+        if cls.DATABASE_URL and not cls.DATABASE_URL.startswith(
+            "postgresql://"
+        ):
+            errors.append("Invalid PostgreSQL DATABASE_URL")
+
+        if cls.APP_ENV == "production":
+            if cls.SECRET_KEY == (
+                "development-only-change-before-deployment"
+            ):
+                errors.append("APP_SECRET_KEY must be configured")
+
+        return errors
+
+
+def get_config():
+    return Config
