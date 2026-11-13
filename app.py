@@ -86,6 +86,12 @@ def start_scheduler_once():
     if getattr(Config, "APP_ENV", "development") != "production":
         return
 
+    # Avoid launching a large recurring scan implicitly on the first page
+    # request. Enable only after the deployment has enough memory and has
+    # passed a manual scan acceptance test.
+    if not getattr(Config, "ENABLE_BACKGROUND_SCHEDULER", False):
+        return
+
     with _scheduler_lock:
         if _scheduler_started:
             return
