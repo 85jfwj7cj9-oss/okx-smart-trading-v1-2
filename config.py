@@ -81,11 +81,19 @@ class Config:
         "SCAN_INTERVAL_SECONDS", 60, 15, 3600
     )
 
+    # Keep the default conservative for small Render instances.
+    # Increase only after measuring memory and scan duration.
     TOP_N_SYMBOLS = get_int(
         "TOP_N_SYMBOLS",
-        get_int("MAX_SCAN_SYMBOLS", 500, 1, 1000),
+        get_int("MAX_SCAN_SYMBOLS", 20, 1, 1000),
         1,
         1000
+    )
+
+    # Background scanning is opt-in. On small/free instances, starting a
+    # full-market scan on the first HTTP request can compete with manual scans.
+    ENABLE_BACKGROUND_SCHEDULER = get_bool(
+        "ENABLE_BACKGROUND_SCHEDULER", False
     )
 
     TIMEFRAMES = ("1H", "4H")
