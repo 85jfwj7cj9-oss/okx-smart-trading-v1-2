@@ -29,10 +29,13 @@ services:
         value: Asia/Taipei
 
       - key: SCAN_INTERVAL_SECONDS
-        value: "60"
+        value: "3600"
 
       - key: TOP_N_SYMBOLS
-        value: "100"
+        value: "20"
+
+      - key: ENABLE_BACKGROUND_SCHEDULER
+        value: "false"
 
       - key: MIN_SIGNAL_SCORE
         value: "60"
